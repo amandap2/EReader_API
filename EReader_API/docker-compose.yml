@@ -1,0 +1,28 @@
+name: ereader
+
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: EReader_API/Dockerfile
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+    environment:
+      - ConnectionStrings__Default=Host=db;Port=5432;Database=ereader;Username=postgres;Password=postgres
+
+
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ereader
+    volumes:
+      - ereader-pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+volumes:
+  ereader-pgdata:
