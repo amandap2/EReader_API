@@ -1,6 +1,6 @@
 # 00 — Fundação
 
-**Status:** Não iniciado
+**Status:** Concluído
 **Depende de:** —
 **Objetivo:** Sair do scaffold: ligar os quatro projetos, configurar `Program.cs`
 (DbContext, DI, CORS, Swagger, ProblemDetails), definir a configuração, gerar a primeira
