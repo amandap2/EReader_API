@@ -1,10 +1,9 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 
-namespace EReader.API.Controllers
+namespace EReader_API.Controllers;
+
+[ApiController]
+public class BookController : ControllerBase
 {
-    [ApiController]
-    public class BookController : Controller
-    {
 
-    }
 }

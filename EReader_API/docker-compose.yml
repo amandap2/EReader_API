@@ -8,10 +8,12 @@ services:
     ports:
       - "8080:8080"
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_HTTP_PORTS=8080
       - ConnectionStrings__Default=Host=db;Port=5432;Database=ereader;Username=postgres;Password=postgres
-
 
   db:
     image: postgres:17
@@ -23,6 +25,11 @@ services:
       - ereader-pgdata:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ereader"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
 volumes:
   ereader-pgdata:
