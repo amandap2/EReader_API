@@ -2,5 +2,5 @@
   <Project Path="EReader_API.Application/EReader_API.Application.csproj" Id="8636d034-df0c-48f0-a38d-eeb4ae0e279f" />
   <Project Path="EReader_API.Domain/EReader_API.Domain.csproj" />
   <Project Path="EReader_API.Infra/EReader_API.Infra.csproj" Id="6b1846f9-b0ca-4fb1-8e38-b4c0fd039662" />
-  <Project Path="EReader_API/EReader.API.csproj" />
+  <Project Path="EReader_API/EReader_API.csproj" />
 </Solution>
