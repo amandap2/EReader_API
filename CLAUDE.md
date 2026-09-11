@@ -15,13 +15,13 @@ Specs (pt-BR), derived from the original handwritten notes:
 
 Read the relevant spec before implementing.
 
-Early scaffold. Most of the intended structure exists (Clean Architecture layers, domain
-entities, repository/service interfaces) but the wiring is incomplete: `Program.cs` registers
-only controllers + OpenAPI, the API project has **no reference to Application or Infra**, DI
-for services/repositories is not set up, `ApplicationDbContext` is never registered, ASP.NET
-Identity is not configured (despite `app.UseAuthorization()`), `BookController` is empty, and
-`BookService` methods throw `NotImplementedException`. Expect to add plumbing, not just
-features.
+Specs 00 (Fundação) and 01 (Identidade) are done: the four projects are wired (DI,
+`ApplicationDbContext`, CORS, ProblemDetails), and ASP.NET Core Identity (`Guid` keys) + JWT
+access tokens + rotated refresh tokens are implemented behind `/api/auth` (see
+`docs/specs/plans/01-identidade.md` for the as-built design and the decisions it had to make
+beyond the spec text). Still open: `Book`/`BookController` don't exist yet — spec 00 removed
+the non-compiling stubs, spec 02 reintroduces `Book` with the redesigned schema. No test
+project exists yet (spec 05).
 
 ## Commands
 
@@ -42,13 +42,11 @@ docker compose -f EReader_API/docker-compose.yml up --build   # API on :8080, Po
 Tests: no test project exists yet. When adding one, wire it into `EReader.slnx` and run with
 `dotnet test`.
 
-EF Core migrations: not set up yet. `dotnet-ef` is not installed and no
-`Microsoft.EntityFrameworkCore.Design` reference exists. Before migrations can be generated,
-the API project must reference `EReader_API.Infra` and register `ApplicationDbContext`. The
-intended commands once that's done:
+EF Core migrations: `dotnet-ef` is installed globally and `EReader_API.Infra` has the design
+package + `ApplicationDbContext` registered. Current migrations: `AddIdentityAndRefreshTokens`
+(Identity tables with `Guid` keys + `RefreshTokens`).
 
 ```bash
-dotnet tool install --global dotnet-ef
 dotnet ef migrations add <Name> --project EReader_API.Infra --startup-project EReader_API
 dotnet ef database update --project EReader_API.Infra --startup-project EReader_API
 ```
@@ -57,28 +55,45 @@ dotnet ef database update --project EReader_API.Infra --startup-project EReader_
 
 Four projects, dependencies point inward toward the domain:
 
-- **EReader_API.Domain** — no dependencies. Entities grouped by bounded context under
-  `Entities/` (`Catalog/Book`, `Identity/User`, `Reading/{Bookmark,Highlight,Note}`) and the
-  repository contracts in `Interfaces/` (`IBookRepository`, etc.). Every repository interface
-  follows the same shape: `Get*Async` / `GetByIdAsync(int?)` / `CreateAsync` / `UpdateAsync` /
-  `RemoveAsync`, all returning the entity (or a collection).
-- **EReader_API.Application** — references Domain only. `Interfaces/IBookService` +
-  `Services/BookService`. Services depend on domain repository interfaces via constructor
-  injection.
-- **EReader_API.Infra** — references Domain only. `Context/ApplicationDbContext`
-  (`IdentityDbContext<ApplicationUser>`, EF Core + Npgsql PostgreSQL), `Repositories/`
-  (implementations of the domain interfaces), `Identity/ApplicationUser` (`: IdentityUser`).
-  `OnModelCreating` calls `ApplyConfigurationsFromAssembly`, so entity configs go in this
-  assembly as `IEntityTypeConfiguration<T>` classes.
-- **EReader_API** — the ASP.NET Core host. Controllers in `Controllers/`. Namespace here is
-  `EReader.API.*` (note: not `EReader_API.*` like the other projects).
+- **EReader_API.Domain** — no dependencies (not even on `ApplicationUser`, which is `Infra`).
+  Entities grouped by bounded context under `Entities/` (`Catalog/Book`,
+  `Reading/{Bookmark,Highlight,Note}`) and the repository contracts in `Interfaces/`
+  (`IBookmarkRepository`, etc.). Every repository interface follows the same shape:
+  `Get*Async` / `GetByIdAsync(int?)` / `CreateAsync` / `UpdateAsync` / `RemoveAsync`, all
+  returning the entity (or a collection). `Reading` entities hold a plain `Guid UserId` with no
+  navigation property (spec 03 owns their full redesign; spec 01 only changed the FK type so
+  the build didn't depend on the now-removed `Domain/Entities/Identity/User`).
+- **EReader_API.Application** — references Domain **and nothing else that carries a runtime
+  dependency on EF/Identity**. `Identity/` holds the auth *ports* (`IAuthService`,
+  `IJwtTokenGenerator`, `IRefreshTokenStore`, `IEmailSender` + their DTOs/exceptions) —
+  implementations live in `Infra`, which references `Application` to provide them (see below).
+  `Common/ClaimsPrincipalExtensions.GetUserId()` reads the `sub` claim as a `Guid`. No `Book`
+  service exists yet (spec 02).
+- **EReader_API.Infra** — references Domain **and Application** (needed so `Infra` can
+  implement the ports declared in `Application`, e.g. `AuthService : IAuthService` using
+  `UserManager<ApplicationUser>`). `Context/ApplicationDbContext`
+  (`IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>`, EF Core + Npgsql, plus
+  `DbSet<RefreshToken>`), `Identity/` (`ApplicationUser : IdentityUser<Guid>` with
+  `DisplayName`/`CreatedAt`, `RefreshToken`, `JwtOptions`, `JwtTokenGenerator`,
+  `RefreshTokenStore`, `LogEmailSender`, `AuthService`). `OnModelCreating` calls
+  `ApplyConfigurationsFromAssembly`, so entity configs go in this assembly as
+  `IEntityTypeConfiguration<T>` classes (`Context/Configurations/`). Also carries an explicit
+  `<FrameworkReference Include="Microsoft.AspNetCore.App" />` — needed because it's a plain
+  `Microsoft.NET.Sdk` class library but registers `AddAuthentication`/`AddJwtBearer` and the
+  `Microsoft.AspNetCore.RateLimiting` policy (`AddRateLimiter` lives in
+  `Microsoft.AspNetCore.Builder`, not `Microsoft.AspNetCore.RateLimiting`) inside
+  `AddInfrastructure`, which only the shared framework provides.
+- **EReader_API** — the ASP.NET Core host. Controllers in `Controllers/`
+  (`AuthController` → `/api/auth/*`, `[EnableRateLimiting("auth")]`, policy applies 10 req/min
+  per IP). Namespace here is `EReader_API.*`, matching the other projects.
 
-### Two parallel user models
+### Identity
 
-`Domain/Entities/Identity/User` is a plain POCO with `int Id` and a `Password` string, and the
-`Reading` entities reference it via `int UserId`. `Infra/Identity/ApplicationUser : IdentityUser`
-is the ASP.NET Identity user with a `string` key. These are not reconciled yet — decide which
-is authoritative before building auth or anything that links reading data to users.
+Single user model: `Infra/Identity/ApplicationUser : IdentityUser<Guid>`. JWT access tokens
+(HMAC-SHA256, claims `sub`/`email`/`name`/`jti`) + opaque refresh tokens (SHA-256 hashed at
+rest in `RefreshTokens`, rotated on `/refresh`, reuse of an already-rotated token revokes every
+active token for that user). `Jwt:SigningKey` is a secret (user-secrets locally / env var
+`Jwt__SigningKey` in containers) — never in `appsettings*.json`.
 
 ## Configuration
 
