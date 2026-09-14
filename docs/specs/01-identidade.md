@@ -1,6 +1,6 @@
 # 01 — Identidade e autenticação
 
-**Status:** Não iniciado
+**Status:** Concluído
 **Depende de:** 00
 **Objetivo:** Implementar o contexto `Identity`: ASP.NET Core Identity com chave `Guid`,
 emissão de JWT + refresh tokens rotacionados, e os endpoints `/api/auth` (register, login,
@@ -91,27 +91,29 @@ Claims do access token: `sub` = `ApplicationUser.Id`, `email`, `name` = `Display
 
 ## Tarefas
 
-- [ ] Trocar `ApplicationDbContext` para `IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>`.
-- [ ] `ApplicationUser` herda de `IdentityUser<Guid>`; adicionar `DisplayName`, `CreatedAt`.
-- [ ] Remover `EReader_API.Domain/Entities/Identity/User.cs` (e ajustar usos — nenhuma outra
+- [x] Trocar `ApplicationDbContext` para `IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>`.
+- [x] `ApplicationUser` herda de `IdentityUser<Guid>`; adicionar `DisplayName`, `CreatedAt`.
+- [x] Remover `EReader_API.Domain/Entities/Identity/User.cs` (e ajustar usos — nenhuma outra
       entidade deve depender dele; entidades futuras usam `Guid UserId`).
-- [ ] `DbSet<RefreshToken>` + `IEntityTypeConfiguration<RefreshToken>` (índice em `TokenHash`,
+- [x] `DbSet<RefreshToken>` + `IEntityTypeConfiguration<RefreshToken>` (índice em `TokenHash`,
       índice em `UserId`).
-- [ ] `AddInfrastructure`: `AddIdentityCore<ApplicationUser>()` (+ `AddRoles`, stores EF,
+- [x] `AddInfrastructure`: `AddIdentityCore<ApplicationUser>()` (+ `AddRoles`, stores EF,
       token providers) e opções de senha/lockout.
-- [ ] `AddInfrastructure`/`Program.cs`: `AddAuthentication(JwtBearerDefaults...)`
+- [x] `AddInfrastructure`/`Program.cs`: `AddAuthentication(JwtBearerDefaults...)`
       `.AddJwtBearer(...)` com `TokenValidationParameters` a partir de `Jwt`.
-- [ ] `Program.cs`: `AddAuthorization()`, `app.UseAuthentication()` antes de `UseAuthorization()`.
-- [ ] `JwtTokenGenerator` (Infra) implementando uma interface em `Application`.
-- [ ] `IRefreshTokenStore` / repositório: criar, achar por hash, revogar, revogar todos do usuário.
-- [ ] `IEmailSender` (Application) + `LogEmailSender` (Infra, loga o link de reset em Dev).
-- [ ] `AuthService` implementando `IAuthService` (validação, hashing via Identity, rotação de refresh).
-- [ ] `AuthController` com os 8 endpoints; `[Authorize]` onde indicado.
-- [ ] Rate limiting: policy `"auth"` (ex. 10 req/min por IP) aplicada a `/api/auth/*`.
-- [ ] Helper `ClaimsPrincipal.GetUserId()` → `Guid`.
-- [ ] Migration `AddIdentityAndRefreshTokens`.
+- [x] `Program.cs`: `AddAuthorization()`, `app.UseAuthentication()` antes de `UseAuthorization()`.
+- [x] `JwtTokenGenerator` (Infra) implementando uma interface em `Application`.
+- [x] `IRefreshTokenStore` / repositório: criar, achar por hash, revogar, revogar todos do usuário.
+- [x] `IEmailSender` (Application) + `LogEmailSender` (Infra, loga o link de reset em Dev).
+- [x] `AuthService` implementando `IAuthService` (validação, hashing via Identity, rotação de refresh).
+- [x] `AuthController` com os 8 endpoints; `[Authorize]` onde indicado.
+- [x] Rate limiting: policy `"auth"` (ex. 10 req/min por IP) aplicada a `/api/auth/*`.
+- [x] Helper `ClaimsPrincipal.GetUserId()` → `Guid`.
+- [x] Migration `AddIdentityAndRefreshTokens`.
 - [ ] Testes (ver spec 05): unit de `AuthService` (rotação, credenciais inválidas, reset) +
-      integração do fluxo register→login→refresh→logout e delete.
+      integração do fluxo register→login→refresh→logout e delete. **Pendente** — validado
+      manualmente via `curl` (ver plano de implementação), mas sem projeto de testes ainda
+      (spec 05).
 
 ## Regras
 
