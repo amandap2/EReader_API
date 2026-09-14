@@ -1,4 +1,4 @@
-namespace EReader_API.Infra.Storage;
+namespace EReader_API.Application.Storage;
 
 public class FileStorageOptions
 {

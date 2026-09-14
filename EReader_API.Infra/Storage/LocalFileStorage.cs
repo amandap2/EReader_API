@@ -1,6 +1,5 @@
 using EReader_API.Application.Storage;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Options;
 
 namespace EReader_API.Infra.Storage;
 
@@ -8,9 +7,9 @@ public class LocalFileStorage : IFileStorage
 {
     private readonly string _rootPath;
 
-    public LocalFileStorage(IOptions<FileStorageOptions> options, IHostEnvironment env)
+    public LocalFileStorage(FileStorageOptions options, IHostEnvironment env)
     {
-        _rootPath = Path.GetFullPath(Path.Combine(env.ContentRootPath, options.Value.RootPath));
+        _rootPath = Path.GetFullPath(Path.Combine(env.ContentRootPath, options.RootPath));
     }
 
     public async Task<string> SaveAsync(Stream content, string contentType, string suggestedName, CancellationToken ct)
