@@ -1,3 +1,4 @@
+using EReader_API.Application.Catalog;
 using EReader_API.Application.Identity;
 using Microsoft.AspNetCore.Identity;
 
@@ -7,7 +8,8 @@ namespace EReader_API.Infra.Identity
         UserManager<ApplicationUser> userManager,
         IJwtTokenGenerator jwtTokenGenerator,
         IRefreshTokenStore refreshTokenStore,
-        IEmailSender emailSender) : IAuthService
+        IEmailSender emailSender,
+        IBookService bookService) : IAuthService
     {
         public async Task<AuthResult> RegisterAsync(RegisterRequest req, CancellationToken ct)
         {
@@ -93,6 +95,7 @@ namespace EReader_API.Infra.Identity
             var user = await userManager.FindByIdAsync(userId.ToString())
                        ?? throw new AuthException("Usuário não encontrado.");
 
+            await bookService.DeleteAllOwnedByUserAsync(userId, ct);
             await userManager.DeleteAsync(user);
         }
 
