@@ -367,3 +367,9 @@ FodyWeavers.xsd
 *.env
 !.env.example
 appsettings.*.Local.json
+
+# Spec 02: seed PDFs de domínio público (baixados manualmente, ver docs/seed/README.md)
+docs/seed/files/*.pdf
+
+# App_Data local (LocalFileStorage, spec 02)
+App_Data/

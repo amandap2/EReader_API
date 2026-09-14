@@ -1,6 +1,7 @@
 using EReader_API.Application;
 using EReader_API.Infra;
 using EReader_API.Infra.Context;
+using EReader_API.Infra.Seed;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
 
@@ -38,6 +39,7 @@ if (app.Environment.IsDevelopment())
 
     using var scope = app.Services.CreateScope();
     scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().Database.Migrate();
+    await scope.ServiceProvider.GetRequiredService<PublicLibrarySeeder>().SeedAsync(default);
 }
 
 app.UseHttpsRedirection();

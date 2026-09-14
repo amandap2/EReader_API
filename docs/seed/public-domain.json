@@ -1,0 +1,16 @@
+[
+  {
+    "title": "Dom Casmurro",
+    "author": "Machado de Assis",
+    "language": "pt-BR",
+    "publishedDate": "1899-01-01",
+    "sourceFile": "dom-casmurro.pdf"
+  },
+  {
+    "title": "Memórias Póstumas de Brás Cubas",
+    "author": "Machado de Assis",
+    "language": "pt-BR",
+    "publishedDate": "1881-01-01",
+    "sourceFile": "memorias-postumas-bras-cubas.pdf"
+  }
+]
