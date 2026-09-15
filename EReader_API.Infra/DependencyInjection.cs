@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Threading.RateLimiting;
 using EReader_API.Application.Catalog;
 using EReader_API.Application.Common;
@@ -99,6 +100,14 @@ public static class DependencyInjection
                     }));
 
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+            options.OnRejected = (context, ct) =>
+            {
+                if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+                    context.HttpContext.Response.Headers.RetryAfter =
+                        ((int)retryAfter.TotalSeconds).ToString(CultureInfo.InvariantCulture);
+
+                return ValueTask.CompletedTask;
+            };
         });
 
         services.AddScoped<IAuthService, AuthService>();
