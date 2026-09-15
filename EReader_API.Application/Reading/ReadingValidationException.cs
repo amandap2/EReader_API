@@ -1,7 +1,5 @@
+using EReader_API.Application.Common.Exceptions;
+
 namespace EReader_API.Application.Reading;
 
-public class ReadingValidationException(IEnumerable<string> errors)
-    : Exception(string.Join("; ", errors))
-{
-    public IReadOnlyCollection<string> Errors { get; } = errors.ToList();
-}
+public class ReadingValidationException(IEnumerable<string> errors) : ValidationException(errors);
