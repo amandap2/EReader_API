@@ -13,6 +13,9 @@ public class ReadingProgressRepository(ApplicationDbContext db) : IReadingProgre
     public async Task<IReadOnlyList<ReadingProgress>> ListByUserAsync(Guid userId, CancellationToken ct) =>
         await db.ReadingProgresses.Where(p => p.UserId == userId).ToListAsync(ct);
 
+    public async Task<IReadOnlyList<ReadingProgress>> ListByBookAsync(Guid bookId, CancellationToken ct) =>
+        await db.ReadingProgresses.Where(p => p.BookId == bookId).ToListAsync(ct);
+
     public async Task UpsertAsync(ReadingProgress progress, CancellationToken ct)
     {
         var existing = await db.ReadingProgresses.FirstOrDefaultAsync(p => p.Id == progress.Id, ct);

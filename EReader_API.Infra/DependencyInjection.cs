@@ -1,10 +1,12 @@
 using System.Threading.RateLimiting;
+using EReader_API.Application.Catalog;
 using EReader_API.Application.Common;
 using EReader_API.Application.Identity;
 using EReader_API.Application.Storage;
 using EReader_API.Domain.Interfaces;
 using EReader_API.Infra.Context;
 using EReader_API.Infra.Identity;
+using EReader_API.Infra.Pdf;
 using EReader_API.Infra.Repositories;
 using EReader_API.Infra.Seed;
 using EReader_API.Infra.Storage;
@@ -106,6 +108,7 @@ public static class DependencyInjection
         services.Configure<FormOptions>(o => o.MultipartBodyLengthLimit = fileStorageOptions.MaxUploadBytes);
 
         services.AddScoped<IFileStorage, LocalFileStorage>();
+        services.AddScoped<IPdfInspector, DocnetPdfInspector>();
         services.AddScoped<IBookRepository, BookRepository>();
         services.AddScoped<PublicLibrarySeeder>();
 

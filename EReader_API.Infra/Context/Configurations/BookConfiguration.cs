@@ -15,6 +15,7 @@ namespace EReader_API.Infra.Context.Configurations
             builder.Property(b => b.FileKey).IsRequired();
             builder.HasIndex(b => b.OwnerId);
             builder.HasIndex(b => b.Source);
+            builder.HasIndex(b => b.Title);
 
             builder.HasOne<ApplicationUser>()
                 .WithMany()
