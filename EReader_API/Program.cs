@@ -1,7 +1,9 @@
+using System.Diagnostics;
 using EReader_API.Application;
 using EReader_API.Infra;
 using EReader_API.Infra.Context;
 using EReader_API.Infra.Seed;
+using EReader_API.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
 
@@ -10,7 +12,15 @@ var builder = WebApplication.CreateBuilder(args);
 // --- Serviços ---
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
-builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddProblemDetails(options =>
+{
+    options.CustomizeProblemDetails = context =>
+    {
+        context.ProblemDetails.Extensions["traceId"] =
+            Activity.Current?.Id ?? context.HttpContext.TraceIdentifier;
+    };
+});
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
