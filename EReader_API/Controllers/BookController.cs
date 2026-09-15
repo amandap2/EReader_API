@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using EReader_API.Application.Catalog;
 using EReader_API.Application.Common;
 using Microsoft.AspNetCore.Authorization;
@@ -13,7 +14,9 @@ public class BookController(IBookService bookService) : ControllerBase
     [HttpGet]
     public async Task<IActionResult> List(
         [FromQuery] string? scope, [FromQuery] string? search, [FromQuery] string? author,
-        [FromQuery] int page = 1, [FromQuery] int pageSize = 20, [FromQuery] string? sort = null,
+        [FromQuery, Range(1, int.MaxValue)] int page = 1,
+        [FromQuery, Range(1, 100)] int pageSize = 20,
+        [FromQuery] string? sort = null,
         CancellationToken ct = default) =>
         Ok(await bookService.ListAsync(scope, search, author, page, pageSize, sort, User.GetUserId(), ct));
 
@@ -62,11 +65,15 @@ public class BookController(IBookService bookService) : ControllerBase
 
 public class UploadBookForm
 {
+    [Required, StringLength(300)]
     public string Title { get; set; } = "";
     public string? Author { get; set; }
     public string? Description { get; set; }
+    [RegularExpression("^[a-z]{2}(-[A-Z]{2})?$")]
     public string? Language { get; set; }
     public DateTime? PublishedDate { get; set; }
+    [Range(1, int.MaxValue)]
     public int? PageCount { get; set; }
+    [Required]
     public IFormFile File { get; set; } = null!;
 }
