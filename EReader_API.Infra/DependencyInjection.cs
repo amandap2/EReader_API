@@ -1,4 +1,5 @@
 using System.Threading.RateLimiting;
+using EReader_API.Application.Common;
 using EReader_API.Application.Identity;
 using EReader_API.Application.Storage;
 using EReader_API.Domain.Interfaces;
@@ -71,6 +72,26 @@ public static class DependencyInjection
                     Window = TimeSpan.FromMinutes(1),
                     QueueLimit = 0,
                 }));
+
+            options.AddPolicy("upload", httpContext => RateLimitPartition.GetFixedWindowLimiter(
+                partitionKey: httpContext.User.GetUserId().ToString(),
+                factory: _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 20,
+                    Window = TimeSpan.FromHours(1),
+                    QueueLimit = 0,
+                }));
+
+            options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                    factory: _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 100,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0,
+                    }));
+
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
         });
 

@@ -3,6 +3,7 @@ using EReader_API.Application.Catalog;
 using EReader_API.Application.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace EReader_API.Controllers;
 
@@ -26,6 +27,7 @@ public class BookController(IBookService bookService) : ControllerBase
 
     [HttpPost]
     [RequestSizeLimit(100_000_000)]
+    [EnableRateLimiting("upload")]
     public async Task<IActionResult> Upload([FromForm] UploadBookForm form, CancellationToken ct)
     {
         var req = new UploadBookRequest(
