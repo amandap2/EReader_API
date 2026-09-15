@@ -1,6 +1,8 @@
 # 04 — Robustez e operação
 
-**Status:** Não iniciado
+**Status:** Em andamento (ver [`plans/04-robustez.md`](plans/04-robustez.md) — implementado exceto
+os itens marcados abaixo; falta apenas 4.6 projeção em banco + verificação ao vivo de dois
+critérios de aceite antes de marcar Concluído)
 **Depende de:** 01, 02, 03
 **Objetivo:** Deixar a API pronta para uso real: tratamento de erros consistente
 (ProblemDetails), validação centralizada, rate limiting, health checks, observabilidade,
@@ -13,90 +15,132 @@ autenticação social — ver Fase 5 em `../ESPECIFICACAO-BACKEND.md`.
 
 ## 4.1 Tratamento de erros
 
-- [ ] `AddProblemDetails()` + `IExceptionHandler` global mapeando exceções de domínio para
+- [x] `AddProblemDetails()` + `IExceptionHandler` global mapeando exceções de domínio para
       status: `NotFoundException → 404`, `ForbiddenException → 403`,
       `ValidationException → 400` (com `errors` por campo), `ConflictException → 409`,
-      demais → `500` sem vazar stack em produção.
-- [ ] Padronizar `type`/`title`/`detail`/`traceId` em todas as respostas de erro.
-- [ ] Remover `throw new NotImplementedException()` remanescentes.
+      demais → `500` sem vazar stack em produção. (Ganhou também `UnauthorizedException → 401`,
+      necessário para não regredir login/refresh — ver D-04-2 no plano.)
+- [x] Padronizar `type`/`title`/`detail`/`traceId` em todas as respostas de erro.
+- [x] Remover `throw new NotImplementedException()` remanescentes. (Nenhum existia.)
 
 ## 4.2 Validação
 
-- [ ] Validação de entrada por DTO (FluentValidation ou `DataAnnotations` + filtro).
+- [x] Validação de entrada por DTO (`DataAnnotations`, usando a validação automática já embutida
+      no `[ApiController]` em vez de um filtro customizado — ver D-04-5 no plano).
       Regras: tamanhos de string, ranges (`pageNumber >= 1`, `pageSize` 1–100), formatos
       (e-mail, cor hex, `language`).
-- [ ] Falha de validação → `400` ProblemDetails com dicionário `errors`.
+- [x] Falha de validação → `400` ProblemDetails com dicionário `errors`.
 
 ## 4.3 Rate limiting
 
-- [ ] `AddRateLimiter`: policy `"auth"` (já introduzida na spec 01, formalizar aqui),
-      policy `"upload"` para `POST /api/books` (ex. 20/hora por usuário), limite global
-      brando por IP.
-- [ ] Resposta `429` com `Retry-After`.
+- [x] `AddRateLimiter`: policy `"auth"` (já introduzida na spec 01, formalizada aqui),
+      policy `"upload"` para `POST /api/books` (20/hora por usuário), limite global
+      brando por IP (100/min).
+- [x] Resposta `429` com `Retry-After`.
 
 ## 4.4 Health checks e observabilidade
 
-- [ ] `AddHealthChecks().AddDbContextCheck<ApplicationDbContext>()` + check de escrita no
+- [x] `AddHealthChecks().AddDbContextCheck<ApplicationDbContext>()` + check de escrita no
       `FileStorage:RootPath`.
-- [ ] Endpoints `GET /health/live` e `GET /health/ready`.
+- [x] Endpoints `GET /health/live` e `GET /health/ready`.
 - [ ] Logging estruturado com `traceId`/`userId` no escopo da requisição; níveis por
-      configuração (já existe base).
-- [ ] (Opcional) OpenTelemetry para traces/métricas.
+      configuração (já existe base). **Não implementado** — fora do plano de implementação
+      (ver seção 9 do plano).
+- [ ] (Opcional) OpenTelemetry para traces/métricas. **Não implementado** (opcional).
 
 ## 4.5 Extração de `PageCount` e capa
 
-- [ ] `IPdfInspector` (Application) + implementação com `PdfPig` (ou `Docnet.Core`) em Infra:
-      `GetPageCount(Stream)` e `RenderFirstPagePng(Stream)`.
-- [ ] No `UploadAsync` (spec 02): após salvar o PDF, extrair `PageCount` e gerar a capa,
-      gravando `CoverImageKey`. Se a extração falhar, logar e seguir com `PageCount` nulo
-      (não bloquear o upload).
-- [ ] Estratégia: síncrono no upload para o MVP; extrair para `IHostedService`/fila se o
-      tempo de resposta incomodar (registrar decisão).
-- [ ] Ao definir `Book.PageCount`, propagar para `ReadingProgress.TotalPages` existentes
-      daquele livro e recalcular `PercentComplete`.
+- [x] `IPdfInspector` (Application) + implementação com `Docnet.Core` (não `PdfPig` — ver D-04-6
+      no plano) em Infra: `InspectAsync` devolve `PageCount` + capa JPEG renderizada da 1ª
+      página.
+- [x] No `UploadAsync`: após salvar o PDF, extrai `PageCount` e gera a capa, gravando
+      `CoverImageKey`. Extração falha → loga e segue com `PageCount` do formulário (ou nulo),
+      sem bloquear o upload — verificado manualmente com um PDF corrompido (magic bytes válidos,
+      corpo inválido): `Book` criado com `201`, `pageCount: null`, warning logado.
+- [x] Estratégia síncrona no upload confirmada (D-04-7 no plano); migrar para
+      `IHostedService`/fila fica para quando/se a latência incomodar.
+- [x] Ao definir `Book.PageCount` (upload ou update), propaga para `ReadingProgress.TotalPages`
+      existentes daquele livro e recalcula `PercentComplete` — verificado manualmente.
 
 ## 4.6 Índices e performance
 
-- [ ] Revisar/confirmar índices: `Book(OwnerId)`, `Book(Source)`, `Book(Title)` para busca;
-      `ReadingProgress(UserId, BookId)` único; `(UserId, BookId)` nas anotações;
-      `RefreshToken(TokenHash)`.
-- [ ] `QueryAsync` de livros: projeção para DTO no banco (`Select`), sem `Include`
-      desnecessário; paginação com `Skip/Take` + `CountAsync` numa única viagem quando
-      possível.
-- [ ] `AsNoTracking()` em todas as leituras.
-- [ ] Busca textual: `ILIKE` no MVP; avaliar `pg_trgm`/full-text se necessário (anotar, não
-      implementar agora).
+- [x] Revisar/confirmar índices: `Book(OwnerId)`, `Book(Source)` já existiam (specs 02/03);
+      `Book(Title)` adicionado nesta spec; `ReadingProgress(UserId, BookId)` único,
+      `(UserId, BookId)` nas anotações e `RefreshToken(TokenHash)` já existiam.
+- [ ] `QueryAsync` de livros: projeção para DTO no banco (`Select`) — **não implementado**;
+      `QueryAsync` ainda materializa `Book` completo (`AsNoTracking()`, mas sem `Select` de
+      DTO) antes do `BookMapper.ToDto` em memória. Paginação com `Skip/Take` + `CountAsync` numa
+      única viagem: mantido como já estava (duas queries — contagem e página — como no código
+      pré-existente; "numa única viagem" não foi implementado).
+- [x] `AsNoTracking()` em todas as leituras — faltava em `BookRepository.GetByIdAsync`/
+      `GetByIdsAsync`/`GetOwnedByUserAsync` e em todos os métodos de leitura dos repositórios de
+      `Reading`; adicionado (commit "4.6 gap fix" — item que não estava nos passos originais do
+      plano, pego na revisão final).
+- [x] Busca textual: `ILIKE` mantido; `pg_trgm`/full-text avaliado e anotado como próximo passo
+      (seção 9 do plano), não implementado agora — conforme a própria spec pede.
 
 ## 4.7 Migrations e configuração
 
-- [ ] Migration `AddCoverAndIndexes` (se houver mudança de schema para capa/índices).
-- [ ] Em produção: não aplicar migration no startup; documentar `dotnet ef database update`
-      no pipeline / entrypoint.
-- [ ] Validar na inicialização que `Jwt:SigningKey`, `ConnectionStrings:Default` e
-      `FileStorage:RootPath` estão presentes; falhar rápido com mensagem clara.
+- [x] Migration `AddPerformanceIndexes` (renomeada de `AddCoverAndIndexes` — sem mudança de
+      schema para capa, `PageCount`/`CoverImageKey` já existiam desde a spec 02; ver D-04-11).
+- [x] Em produção: `Database.Migrate()` já só roda dentro do bloco
+      `if (app.Environment.IsDevelopment())` (pré-existente, spec 00); `dotnet ef database
+      update` já documentado no `CLAUDE.md`.
+- [x] Validar na inicialização: `Jwt:SigningKey` agora falha rápido via `ValidateOnStart()`
+      (verificado manualmente); `ConnectionStrings:Default` já falhava rápido desde a spec 00;
+      `FileStorage:RootPath` não é validado por presença (tem default, nunca "ausente") — sua
+      gravabilidade é responsabilidade do health check de storage (4.4), não do startup.
 
 ## Critérios de aceite
 
-- Toda rota de erro retorna `application/problem+json` com `traceId`; nenhuma `500` vaza
-  stack em `Production`.
-- Payload inválido → `400` com `errors` por campo.
-- Estourar a policy de `auth`/`upload` → `429` com `Retry-After`.
-- `GET /health/ready` fica `Unhealthy` quando o banco está fora ou o diretório de storage não
-  é gravável.
-- Upload de um PDF de N páginas resulta em `Book.PageCount == N` e `CoverImageKey` preenchido;
-  PDF corrompido ainda cria o `Book` (sem `PageCount`) e loga o erro.
-- Após o `PageCount` ser definido, `GET /api/books/{id}/progress` passa a retornar
-  `percentComplete` > 0 para quem já tinha progresso.
-- `EXPLAIN` da listagem de livros usa índice (sem seq scan em tabela grande).
+- [x] Toda rota de erro retorna `application/problem+json` com `traceId`; nenhuma `500` vaza
+  stack em `Production`. **Verificado manualmente.**
+- [x] Payload inválido → `400` com `errors` por campo. **Verificado manualmente.**
+- [x] Estourar a policy de `auth` → `429` com `Retry-After`. **Verificado manualmente**
+  (11ª tentativa de login em <1min). A policy `upload` (20/hora) usa a mesma implementação —
+  não foi exercitada ao vivo (impraticável fazer 21 uploads reais numa sessão de verificação).
+- [x] `GET /health/ready` fica `Unhealthy` quando o banco está fora. **Verificado manualmente**
+  (`docker stop`/`start` do container Postgres). O caso "diretório de storage não gravável" não
+  foi exercitado ao vivo (mudar permissões de pasta no Windows local não reflete o ambiente do
+  container Linux) — `FileStorageHealthCheck` foi revisado por código, não testado ao vivo nesse
+  caminho específico.
+- [x] Upload de um PDF de N páginas resulta em `Book.PageCount == N` e `CoverImageKey`
+  preenchido; PDF corrompido ainda cria o `Book` (sem `PageCount`) e loga o erro. **Ambos os
+  casos verificados manualmente** (upload real de PDF + upload de PDF com magic bytes válidos e
+  corpo corrompido).
+- [x] Após o `PageCount` ser definido, `GET /api/books/{id}/progress` passa a retornar
+  `percentComplete` > 0 para quem já tinha progresso. **Verificado manualmente.**
+- [ ] `EXPLAIN` da listagem de livros usa índice (sem seq scan em tabela grande). **Não
+  verificado** — precisaria de massa de dados real para ser conclusivo; o índice
+  `Book(Title)` foi criado (migration `AddPerformanceIndexes`), mas nenhum `EXPLAIN` foi rodado
+  nesta sessão.
 
-## Arquivos afetados
+## Arquivos afetados (como implementado)
 
-- `EReader_API/Program.cs` (ProblemDetails, rate limiter, health checks, validação de config)
-- `EReader_API/Infrastructure/GlobalExceptionHandler.cs` (novo)
-- `EReader_API.Application/Common/Exceptions/*` (novo)
-- `EReader_API.Application/**/Validators/*` (novo)
-- `EReader_API.Application/Catalog/IPdfInspector.cs` + `EReader_API.Infra/Pdf/PdfPigInspector.cs`
-- `EReader_API.Application/Catalog/BookService.cs` (extração no upload, propagação de `TotalPages`)
-- `EReader_API.Infra/Context/Configurations/*` (índices)
-- `EReader_API.Infra/Repositories/BookRepository.cs` (projeção/paginação)
-- `EReader_API.Infra/Migrations/*`
+- `EReader_API/Program.cs` — `AddExceptionHandler`/`AddProblemDetails` customizado, ordem do
+  pipeline (`UseRateLimiter` depois de `UseAuthentication`/`UseAuthorization`), `MapHealthChecks`.
+- `EReader_API/Infrastructure/GlobalExceptionHandler.cs` (novo).
+- `EReader_API.Application/Common/Exceptions/*` (novo — `NotFoundException`,
+  `ForbiddenException`, `ValidationException`, `ConflictException`, `UnauthorizedException`).
+- `EReader_API.Application/Common/ReadingProgressCalculator.cs` (movido de `Reading/`).
+- DTOs de request em `Application/Identity/Dtos`, `Application/Reading/Dtos`,
+  `Application/Catalog/Dtos` + `EReader_API/Controllers/BookController.cs`
+  (`UploadBookForm`) — `DataAnnotations`, sem pasta `Validators/` separada (não foi necessária,
+  ver D-04-5 no plano).
+- `EReader_API.Application/Catalog/IPdfInspector.cs` + `EReader_API.Infra/Pdf/
+  DocnetPdfInspector.cs` (não `PdfPigInspector.cs` — ver D-04-6 no plano).
+- `EReader_API.Application/Catalog/BookForbiddenException.cs` (novo — bloqueia `DELETE` de
+  livro `PublicDomain`, D-04-9).
+- `EReader_API.Application/Catalog/BookService.cs` (extração no upload, propagação de
+  `TotalPages`, bloqueio de delete público).
+- `EReader_API.Application/Storage/IFileStorage.cs` + `EReader_API.Infra/Storage/
+  LocalFileStorage.cs` (`SaveCoverAsync` novo) + `EReader_API.Infra/Storage/
+  FileStorageHealthCheck.cs` (novo).
+- `EReader_API.Domain/Interfaces/IReadingProgressRepository.cs` +
+  `EReader_API.Infra/Repositories/ReadingProgressRepository.cs` (`ListByBookAsync` novo).
+- `EReader_API.Infra/Context/Configurations/BookConfiguration.cs` (índice `Title`).
+- `EReader_API.Infra/Repositories/*.cs` (`AsNoTracking()` em todas as leituras — **não**
+  incluindo projeção para DTO em `BookRepository.QueryAsync`, que permanece pendente).
+- `EReader_API.Infra/DependencyInjection.cs` (policy `upload`, limiter global, `Retry-After`,
+  health checks, `IPdfInspector`, validação de `JwtOptions`).
+- `EReader_API.Infra/Migrations/*AddPerformanceIndexes*` (novo).
