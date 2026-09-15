@@ -24,13 +24,13 @@ public class BookService(IBookRepository repository, IFileStorage fileStorage, F
         var result = await repository.QueryAsync(query, ct);
 
         return new PagedResult<BookDto>(
-            result.Items.Select(ToDto).ToList(), result.TotalCount, result.Page, result.PageSize);
+            result.Items.Select(BookMapper.ToDto).ToList(), result.TotalCount, result.Page, result.PageSize);
     }
 
     public async Task<BookDto> GetAsync(Guid id, Guid requesterId, CancellationToken ct)
     {
         var book = await GetAuthorizedAsync(id, requesterId, ct);
-        return ToDto(book);
+        return BookMapper.ToDto(book);
     }
 
     public async Task<BookDto> UploadAsync(UploadBookRequest req, Guid ownerId, CancellationToken ct)
@@ -79,7 +79,7 @@ public class BookService(IBookRepository repository, IFileStorage fileStorage, F
         };
 
         await repository.AddAsync(book, ct);
-        return ToDto(book);
+        return BookMapper.ToDto(book);
     }
 
     public async Task<BookDto> UpdateAsync(Guid id, UpdateBookRequest req, Guid requesterId, CancellationToken ct)
@@ -100,7 +100,7 @@ public class BookService(IBookRepository repository, IFileStorage fileStorage, F
         book.UpdatedAt = DateTime.UtcNow;
 
         await repository.UpdateAsync(book, ct);
-        return ToDto(book);
+        return BookMapper.ToDto(book);
     }
 
     public async Task DeleteAsync(Guid id, Guid requesterId, CancellationToken ct)
@@ -154,9 +154,4 @@ public class BookService(IBookRepository repository, IFileStorage fileStorage, F
             "all" or null or "" => BookScope.All,
             _ => throw new BookValidationException([$"Valor de 'scope' inválido: '{scope}'."]),
         };
-
-    private static BookDto ToDto(Book book) => new(
-        book.Id, book.Title, book.Author, book.Description, book.Language,
-        book.Format, book.Source.ToString(), book.OwnerId, book.FileSizeBytes, book.PageCount,
-        book.CoverImageKey is not null, book.PublishedDate, book.CreatedAt, book.UpdatedAt);
 }

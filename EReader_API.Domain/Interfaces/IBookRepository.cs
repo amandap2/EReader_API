@@ -6,6 +6,7 @@ namespace EReader_API.Domain.Interfaces;
 public interface IBookRepository
 {
     Task<Book?> GetByIdAsync(Guid id, CancellationToken ct);
+    Task<IReadOnlyList<Book>> GetByIdsAsync(IEnumerable<Guid> ids, CancellationToken ct);
     Task<IReadOnlyList<Book>> GetOwnedByUserAsync(Guid ownerId, CancellationToken ct);
     Task<PagedResult<Book>> QueryAsync(BookQuery query, CancellationToken ct);
     Task AddAsync(Book book, CancellationToken ct);
