@@ -1,13 +1,11 @@
-﻿using EReader_API.Domain.Entities.Catalog;
+namespace EReader_API.Domain.Entities.Reading;
 
-namespace EReader_API.Domain.Entities.Reading
+public class Bookmark
 {
-    public class Bookmark
-    {
-        public int Id { get; set; }
-        public Book Book { get; set; }
-        public int BookId { get; set; }
-        public Guid UserId { get; set; }
-        public int PageNumber {  get; set; }
-    }
+    public Guid Id { get; set; }
+    public Guid UserId { get; set; }
+    public Guid BookId { get; set; }
+    public int PageNumber { get; set; }
+    public string? Label { get; set; }
+    public DateTime CreatedAt { get; set; }
 }

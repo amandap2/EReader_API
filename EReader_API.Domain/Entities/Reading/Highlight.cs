@@ -1,14 +1,13 @@
-﻿using EReader_API.Domain.Entities.Catalog;
+namespace EReader_API.Domain.Entities.Reading;
 
-namespace EReader_API.Domain.Entities.Reading
+public class Highlight
 {
-    public class Highlight
-    {
-        public int Id { get; set; }
-        public Book Book { get; set; }
-        public int BookId { get; set; }
-        public Guid UserId { get; set; }
-        public string TextContent { get; set; }
-        public int PageNumber { get; set; }
-    }
+    public Guid Id { get; set; }
+    public Guid UserId { get; set; }
+    public Guid BookId { get; set; }
+    public int PageNumber { get; set; }
+    public string TextContent { get; set; } = "";
+    public string? Color { get; set; }
+    public string? Anchor { get; set; }
+    public DateTime CreatedAt { get; set; }
 }

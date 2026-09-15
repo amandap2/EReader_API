@@ -1,14 +1,12 @@
-﻿using EReader_API.Domain.Entities.Catalog;
 using EReader_API.Domain.Entities.Reading;
 
-namespace EReader_API.Domain.Interfaces
+namespace EReader_API.Domain.Interfaces;
+
+public interface INoteRepository
 {
-    public interface INoteRepository
-    {
-        Task<IEnumerable<Note>> GetNotesAsync();
-        Task<Note> GetByIdAsync(int? id);
-        Task<Note> CreateAsync(Note note);
-        Task<Note> UpdateAsync(Note note);
-        Task<Note> RemoveAsync(Note note);
-    }
+    Task<IReadOnlyList<Note>> ListAsync(Guid userId, Guid bookId, CancellationToken ct);
+    Task<Note?> GetByIdAsync(Guid id, CancellationToken ct);
+    Task AddAsync(Note note, CancellationToken ct);
+    Task UpdateAsync(Note note, CancellationToken ct);
+    Task RemoveAsync(Note note, CancellationToken ct);
 }

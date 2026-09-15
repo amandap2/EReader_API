@@ -20,6 +20,7 @@ Planos passo a passo para executar cada spec ficam em [`plans/`](plans/):
 - [`plans/00-fundacao.md`](plans/00-fundacao.md)
 - [`plans/01-identidade.md`](plans/01-identidade.md)
 - [`plans/02-catalogo-e-upload.md`](plans/02-catalogo-e-upload.md)
+- [`plans/03-leitura.md`](plans/03-leitura.md)
 
 ## Convenções
 

@@ -1,4 +1,5 @@
 using EReader_API.Domain.Entities.Catalog;
+using EReader_API.Domain.Entities.Reading;
 using EReader_API.Infra.Identity;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
@@ -12,6 +13,10 @@ namespace EReader_API.Infra.Context
 
         public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
         public DbSet<Book> Books => Set<Book>();
+        public DbSet<ReadingProgress> ReadingProgresses => Set<ReadingProgress>();
+        public DbSet<Bookmark> Bookmarks => Set<Bookmark>();
+        public DbSet<Highlight> Highlights => Set<Highlight>();
+        public DbSet<Note> Notes => Set<Note>();
 
         protected override void OnModelCreating(ModelBuilder builder)
         {

@@ -15,9 +15,9 @@ Specs (pt-BR), derived from the original handwritten notes:
 
 Read the relevant spec before implementing.
 
-Specs 00 (Fundação), 01 (Identidade) and 02 (Catálogo e upload) are done. 00/01 wired the four
-projects (DI, `ApplicationDbContext`, CORS, ProblemDetails) and ASP.NET Core Identity (`Guid`
-keys) + JWT access tokens + rotated refresh tokens behind `/api/auth` (see
+Specs 00 (Fundação), 01 (Identidade), 02 (Catálogo e upload) and 03 (Leitura) are done. 00/01
+wired the four projects (DI, `ApplicationDbContext`, CORS, ProblemDetails) and ASP.NET Core
+Identity (`Guid` keys) + JWT access tokens + rotated refresh tokens behind `/api/auth` (see
 `docs/specs/plans/01-identidade.md` for the as-built design). 02 redesigned `Book` (public vs.
 personal visibility), added `IBookRepository`/`BookRepository`, `IFileStorage`/
 `LocalFileStorage`, `IBookService`/`BookService`, `BookController` (`/api/books`, all 7
@@ -25,7 +25,14 @@ endpoints, streaming with `Range`), and a seed for the public-domain library —
 `docs/specs/plans/02-catalogo-e-upload.md` for the as-built design and the decisions it had to
 make beyond the spec text (`IFileStorage` living in `Application` rather than `Domain`,
 `IBookService` gaining `OpenCoverAsync`/`DeleteAllOwnedByUserAsync` beyond the spec's literal
-contract, etc.). No test project exists yet (spec 05).
+contract, etc.). 03 redesigned the `Reading` entities (`Bookmark`/`Highlight`/`Note`, plus new
+`ReadingProgress`) to `Guid` with no navigation properties, added the matching repositories,
+`IReadingProgressService`/`IBookmarkService`/`IHighlightService`/`INoteService`/`ILibraryService`,
+5 controllers (`/api/books/{bookId}/progress`, `/bookmarks`, `/highlights`, `/notes`,
+`/api/library`), and made all `Reading` cascade deletion (on `Book` or account removal) a pure
+database-FK concern — no application code orchestrates it, unlike the `Book`↔file cascade from
+02 — see `docs/specs/plans/03-leitura.md` for the as-built design and decisions (D-03-1 to
+D-03-10). No test project exists yet (spec 05).
 
 ## Commands
 
@@ -48,8 +55,11 @@ Tests: no test project exists yet. When adding one, wire it into `EReader.slnx` 
 
 EF Core migrations: `dotnet-ef` is installed globally and `EReader_API.Infra` has the design
 package + `ApplicationDbContext` registered. Current migrations: `AddIdentityAndRefreshTokens`
-(Identity tables with `Guid` keys + `RefreshTokens`) and `AddBookCatalog` (`Books`, FK
-`OwnerId → AspNetUsers` with cascade delete, CHECK on the `Source`/`OwnerId` invariant).
+(Identity tables with `Guid` keys + `RefreshTokens`), `AddBookCatalog` (`Books`, FK
+`OwnerId → AspNetUsers` with cascade delete, CHECK on the `Source`/`OwnerId` invariant), and
+`AddReadingContext` (`Bookmarks`/`Highlights`/`Notes`/`ReadingProgresses`, FK `BookId → Books`
+and `UserId → AspNetUsers` with cascade delete on all four, FK `Notes.HighlightId → Highlights`
+with `SET NULL`, unique index on `ReadingProgresses(UserId, BookId)`).
 
 ```bash
 dotnet ef migrations add <Name> --project EReader_API.Infra --startup-project EReader_API
@@ -62,26 +72,37 @@ Four projects, dependencies point inward toward the domain:
 
 - **EReader_API.Domain** — no dependencies (not even on `ApplicationUser`, which is `Infra`).
   Entities grouped by bounded context under `Entities/` (`Catalog/Book` + `BookSource`/
-  `BookScope`/`BookQuery`, `Reading/{Bookmark,Highlight,Note}`), `Common/PagedResult<T>`, and
-  the repository contracts in `Interfaces/` (`IBookRepository`, `IBookmarkRepository`, etc.).
-  `IBookRepository` does **not** follow the older `Get*Async`/`GetByIdAsync(int?)` shape still
-  used by the `Reading` repositories — it takes `Guid` ids and exposes `QueryAsync(BookQuery)
-  -> PagedResult<Book>` for scope/search/sort/pagination, plus `GetOwnedByUserAsync` for the
-  account-deletion cascade (spec 02). `Reading` entities hold a plain `Guid UserId` with no
-  navigation property (spec 03 owns their full redesign; spec 01 only changed the FK type so
-  the build didn't depend on the now-removed `Domain/Entities/Identity/User`).
+  `BookScope`/`BookQuery`, `Reading/{Bookmark,Highlight,Note,ReadingProgress}`),
+  `Common/PagedResult<T>`, and the repository contracts in `Interfaces/` (`IBookRepository`,
+  `IBookmarkRepository`, `IHighlightRepository`, `INoteRepository`,
+  `IReadingProgressRepository`). All five repository interfaces now share the same shape:
+  `Guid` ids, `CancellationToken` on every method, `AddAsync`/`UpdateAsync`/`RemoveAsync`
+  returning `Task` (not `Task<T>`) — `IBookRepository` additionally exposes
+  `QueryAsync(BookQuery) -> PagedResult<Book>` for scope/search/sort/pagination and
+  `GetByIdsAsync`/`GetOwnedByUserAsync` for batch/owner lookups (spec 02/03). `Reading` entities
+  hold plain `Guid BookId`/`UserId` fields with **no navigation properties** to `Book` or
+  `ApplicationUser` (spec 03) — same reasoning as `Book` itself not navigating to `Reading`.
 - **EReader_API.Application** — references Domain **and nothing else that carries a runtime
   dependency on EF/Identity/ASP.NET Core**. `Identity/` holds the auth *ports* (`IAuthService`,
   `IJwtTokenGenerator`, `IRefreshTokenStore`, `IEmailSender` + their DTOs/exceptions);
   `Storage/` holds `IFileStorage` + `FileStorageOptions` (a plain POCO, shared as-is with
-  `Infra` — see below); `Catalog/` holds `IBookService`/`BookService` + DTOs
-  (`BookDto`/`UploadBookRequest`/`UpdateBookRequest`/`FileDownload`) + exceptions
-  (`BookNotFoundException`, `BookValidationException`). Implementations of the *ports*
-  (`IAuthService`, `IFileStorage`) live in `Infra`, which references `Application` to provide
-  them; `BookService` itself lives here (it only depends on `IBookRepository`/`IFileStorage`
-  abstractions, no EF/Identity). `Common/ClaimsPrincipalExtensions.GetUserId()` reads the `sub`
-  claim as a `Guid`. Upload DTOs use `Stream`/`string` rather than `IFormFile` — the mapping
-  from `IFormFile` happens in the `EReader_API` host controller.
+  `Infra` — see below); `Catalog/` holds `IBookService`/`BookService` + `BookMapper` (public
+  `Book -> BookDto` mapping, extracted in spec 03 so `Reading/LibraryService` can reuse it) +
+  DTOs (`BookDto`/`UploadBookRequest`/`UpdateBookRequest`/`FileDownload`) + exceptions
+  (`BookNotFoundException`, `BookValidationException`); `Reading/` holds the four Reading
+  services (`IReadingProgressService`, `IBookmarkService`, `IHighlightService`, `INoteService`)
+  + `ILibraryService`/`LibraryService` + `Dtos/` + `ReadingNotFoundException`/
+  `ReadingValidationException` (mirror `Catalog`'s exceptions) + `ReadingProgressCalculator`
+  (pure `PercentComplete` calculation) + `BookAccessGuard` (`internal`, shared "book exists and
+  requester can read it" check reused by all four Reading services — same rule as
+  `BookService`'s private `GetAuthorizedAsync`, duplicated rather than exposed publicly on
+  `IBookService` since only `Reading` needs it). Implementations of the *ports* (`IAuthService`,
+  `IFileStorage`) live in `Infra`, which references `Application` to provide them;
+  `BookService`/`Reading` services themselves live here (they only depend on
+  `IBookRepository`/`IFileStorage`/the `Reading` repository abstractions, no EF/Identity).
+  `Common/ClaimsPrincipalExtensions.GetUserId()` reads the `sub` claim as a `Guid`. Upload DTOs
+  use `Stream`/`string` rather than `IFormFile` — the mapping from `IFormFile` happens in the
+  `EReader_API` host controller.
 - **EReader_API.Infra** — references Domain **and Application** (needed so `Infra` can
   implement the ports declared in `Application`, e.g. `AuthService : IAuthService` using
   `UserManager<ApplicationUser>`, `LocalFileStorage : IFileStorage`). `Context/ApplicationDbContext`
@@ -90,14 +111,24 @@ Four projects, dependencies point inward toward the domain:
   `DisplayName`/`CreatedAt`, `RefreshToken`, `JwtOptions`, `JwtTokenGenerator`,
   `RefreshTokenStore`, `LogEmailSender`, `AuthService` — the latter also calls
   `IBookService.DeleteAllOwnedByUserAsync` before deleting the Identity user, so account
-  deletion cascades to the user's `UserUpload` books and files), `Repositories/BookRepository`,
-  `Storage/LocalFileStorage` (resolves `FileStorage:RootPath` against
-  `IHostEnvironment.ContentRootPath`, guards reads against path traversal),
-  `Seed/PublicLibrarySeeder` (reads `docs/seed/public-domain.json`, tolerates missing seed PDFs
-  by logging and skipping rather than failing startup). `OnModelCreating` calls
-  `ApplyConfigurationsFromAssembly`, so entity configs go in this assembly as
-  `IEntityTypeConfiguration<T>` classes (`Context/Configurations/`, includes `BookConfiguration`
-  with a CHECK constraint enforcing `Source`/`OwnerId`). Also carries an explicit
+  deletion cascades to the user's `UserUpload` books and files; the `Reading` rows cascade on
+  their own via FK, `AuthService` doesn't need to know about them), `Repositories/BookRepository`
+  + `ReadingProgressRepository`/`BookmarkRepository`/`HighlightRepository`/`NoteRepository`
+  (same no-unit-of-work style: `SaveChangesAsync` per operation), `Storage/LocalFileStorage`
+  (resolves `FileStorage:RootPath` against `IHostEnvironment.ContentRootPath`, guards reads
+  against path traversal), `Seed/PublicLibrarySeeder` (reads `docs/seed/public-domain.json`,
+  tolerates missing seed PDFs by logging and skipping rather than failing startup).
+  `OnModelCreating` calls `ApplyConfigurationsFromAssembly`, so entity configs go in this
+  assembly as `IEntityTypeConfiguration<T>` classes (`Context/Configurations/`, includes
+  `BookConfiguration` with a CHECK constraint enforcing `Source`/`OwnerId`, and
+  `ReadingProgressConfiguration`/`BookmarkConfiguration`/`HighlightConfiguration`/
+  `NoteConfiguration` — all four FK `BookId -> Books` and `UserId -> AspNetUsers` with
+  `OnDelete(Cascade)`, `ReadingProgress` additionally unique on `(UserId, BookId)`, `Note`
+  additionally FK `HighlightId -> Highlights` with `OnDelete(SetNull)` so removing a `Highlight`
+  detaches linked notes instead of deleting them — verified against a live Postgres instance
+  that a row reachable via two cascade paths, e.g. `User -> Book -> Reading` and
+  `User -> Reading` directly, deletes cleanly; this is disallowed at migration time on SQL
+  Server but fine on Postgres). Also carries an explicit
   `<FrameworkReference Include="Microsoft.AspNetCore.App" />` — needed because it's a plain
   `Microsoft.NET.Sdk` class library but registers `AddAuthentication`/`AddJwtBearer`, the
   `Microsoft.AspNetCore.RateLimiting` policy (`AddRateLimiter` lives in
@@ -107,8 +138,13 @@ Four projects, dependencies point inward toward the domain:
 - **EReader_API** — the ASP.NET Core host. Controllers in `Controllers/`
   (`AuthController` → `/api/auth/*`, `[EnableRateLimiting("auth")]`, policy applies 10 req/min
   per IP; `BookController` → `/api/books/*`, `[Authorize]` on all 7 endpoints, maps
-  `IFormFile` → `UploadBookRequest`). Namespace here is `EReader_API.*`, matching the other
-  projects.
+  `IFormFile` → `UploadBookRequest`; `ReadingProgressController` →
+  `/api/books/{bookId}/progress`; `BookmarksController`/`HighlightsController`/
+  `NotesController` — no controller-level `[Route]`, each `[Http*]` carries its full path
+  instead, because each resource mixes endpoints nested under `/api/books/{bookId}/...` with
+  flat ones under `/api/{resource}/{id}` (spec 03, D-03-7); `LibraryController` →
+  `/api/library`). All `Reading` controllers `[Authorize]`. Namespace here is `EReader_API.*`,
+  matching the other projects.
 
 ### Identity
 
@@ -133,6 +169,31 @@ validation (title length, `PageCount >= 1`, `Content-Type: application/pdf`, `%P
 bytes, `FileStorage:MaxUploadBytes`) all funnels through `BookValidationException`, mirroring
 `IdentityValidationException` from Auth. No spec-02 flow ever sets `CoverImageKey` — cover
 extraction is spec 04's job (`GET .../cover` always `404` until then).
+
+### Reading
+
+Progress (`ReadingProgress`), bookmarks, highlights and notes, all scoped to `(UserId, BookId)`
+with no navigation properties. Every operation first calls `BookAccessGuard.EnsureAccessibleAsync`
+(same "public, or own `UserUpload`" rule as `Catalog`) — a book the requester can't read, and a
+`Reading` row that exists but belongs to someone else, both surface as `404`
+(`ReadingNotFoundException`), same "don't leak existence" pattern as `Catalog`. `PUT
+/api/books/{id}/progress` is an upsert on the unique `(UserId, BookId)` index —
+`ReadingProgressRepository.UpsertAsync` re-fetches by `Id` before deciding `Add` vs.
+`CurrentValues.SetValues`, since the entity the service passes in is never already tracked by
+the `DbContext`. `CurrentPage` must be in `[1, Book.PageCount]` when `PageCount` is known
+(`400` otherwise); `PercentComplete` is `0` when `PageCount` is `null`, via the pure
+`ReadingProgressCalculator.PercentComplete`. `Note.HighlightId` is validated against the same
+user + `BookId` at create time; deleting the `Highlight` doesn't delete the note — the FK
+`OnDelete(SetNull)` detaches it. Deleting a `Book` or an `ApplicationUser` cascades all four
+`Reading` tables purely via FK `ON DELETE CASCADE` — no code in `BookService`/`AuthService`
+orchestrates it (contrast with the `Book`↔file cascade from spec 02, which needs application
+code because a file on disk has no FK). `GET /api/library` (`LibraryService`) unions the
+requester's owned books with any book (owned or public) that has `ReadingProgress`, batching the
+public ones via `IBookRepository.GetByIdsAsync` to avoid N+1, sorted by `progress.LastReadAt`
+desc (books never opened sort last). Known gap (not fixed by spec 03): `BookService.DeleteAsync`
+only blocks deleting a `UserUpload` book owned by someone else — any authenticated user can
+delete a `PublicDomain` book, which now also cascades away every other user's progress/
+annotations on it; flagged for spec 04.
 
 ## Configuration
 

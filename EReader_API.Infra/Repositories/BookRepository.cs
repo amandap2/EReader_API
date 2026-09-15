@@ -11,6 +11,9 @@ public class BookRepository(ApplicationDbContext db) : IBookRepository
     public Task<Book?> GetByIdAsync(Guid id, CancellationToken ct) =>
         db.Books.FirstOrDefaultAsync(b => b.Id == id, ct);
 
+    public async Task<IReadOnlyList<Book>> GetByIdsAsync(IEnumerable<Guid> ids, CancellationToken ct) =>
+        await db.Books.Where(b => ids.Contains(b.Id)).ToListAsync(ct);
+
     public async Task<IReadOnlyList<Book>> GetOwnedByUserAsync(Guid ownerId, CancellationToken ct) =>
         await db.Books.Where(b => b.OwnerId == ownerId).ToListAsync(ct);
 

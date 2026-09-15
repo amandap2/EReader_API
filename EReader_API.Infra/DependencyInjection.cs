@@ -88,6 +88,11 @@ public static class DependencyInjection
         services.AddScoped<IBookRepository, BookRepository>();
         services.AddScoped<PublicLibrarySeeder>();
 
+        services.AddScoped<IReadingProgressRepository, ReadingProgressRepository>();
+        services.AddScoped<IBookmarkRepository, BookmarkRepository>();
+        services.AddScoped<IHighlightRepository, HighlightRepository>();
+        services.AddScoped<INoteRepository, NoteRepository>();
+
         return services;
     }
 }
