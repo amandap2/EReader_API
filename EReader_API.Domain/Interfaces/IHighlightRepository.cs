@@ -1,14 +1,12 @@
-﻿using EReader_API.Domain.Entities.Catalog;
 using EReader_API.Domain.Entities.Reading;
 
-namespace EReader_API.Domain.Interfaces
+namespace EReader_API.Domain.Interfaces;
+
+public interface IHighlightRepository
 {
-    public interface IHighlightRepository
-    {
-        Task<IEnumerable<Highlight>> GetHighlightsAsync();
-        Task<Highlight> GetByIdAsync(int? id);
-        Task<Highlight> CreateAsync(Highlight highlight);
-        Task<Highlight> UpdateAsync(Highlight highlight);
-        Task<Highlight> RemoveAsync(Highlight highlight);
-    }
+    Task<IReadOnlyList<Highlight>> ListAsync(Guid userId, Guid bookId, CancellationToken ct);
+    Task<Highlight?> GetByIdAsync(Guid id, CancellationToken ct);
+    Task AddAsync(Highlight highlight, CancellationToken ct);
+    Task UpdateAsync(Highlight highlight, CancellationToken ct);
+    Task RemoveAsync(Highlight highlight, CancellationToken ct);
 }
