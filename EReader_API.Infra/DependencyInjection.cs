@@ -19,6 +19,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
 namespace EReader_API.Infra;
@@ -49,7 +50,10 @@ public static class DependencyInjection
             .AddEntityFrameworkStores<ApplicationDbContext>()
             .AddDefaultTokenProviders();
 
-        services.Configure<JwtOptions>(configuration.GetSection("Jwt"));
+        services.AddOptions<JwtOptions>()
+            .Bind(configuration.GetSection("Jwt"))
+            .Validate(o => !string.IsNullOrWhiteSpace(o.SigningKey), "Jwt:SigningKey não configurado.")
+            .ValidateOnStart();
 
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>
