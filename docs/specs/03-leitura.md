@@ -1,6 +1,6 @@
 # 03 — Leitura (core domain)
 
-**Status:** Não iniciado
+**Status:** Concluído
 **Depende de:** 00, 01, 02
 **Objetivo:** Implementar o contexto `Reading` (domínio principal): progresso de leitura por
 usuário/livro, marcadores (`Bookmark`), destaques (`Highlight`) e notas (`Note`), mais o
