@@ -399,9 +399,9 @@ using System.ComponentModel.DataAnnotations;
 namespace EReader_API.Application.Identity;
 
 public record RegisterRequest(
-    [property: Required, EmailAddress] string Email,
-    [property: Required, MinLength(8)] string Password,
-    [property: Required, StringLength(100)] string DisplayName);
+    [Required, EmailAddress] string Email,
+    [Required, MinLength(8)] string Password,
+    [Required, StringLength(100)] string DisplayName);
 
 // UpdateHighlightRequest.cs
 using System.ComponentModel.DataAnnotations;
@@ -409,9 +409,18 @@ using System.ComponentModel.DataAnnotations;
 namespace EReader_API.Application.Reading;
 
 public record UpdateHighlightRequest(
-    [property: RegularExpression("^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$")] string? Color,
+    [RegularExpression("^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$")] string? Color,
     string? TextContent);
 ```
+
+> **Correção pós-implementação**: atributos em parâmetro de `record` **não** levam o prefixo
+> `[property: ...]` aqui — sem target explícito, o atributo já se associa ao parâmetro do
+> construtor primário, que é o que o `ModelMetadata`/`ObjectModelValidator` do ASP.NET Core exige
+> para validar records vindos do corpo da requisição. Com `[property: ...]`, o runtime lança
+> `InvalidOperationException` ("...will be ignored... validation metadata must be associated with
+> the constructor parameter") em toda requisição que bate nesse DTO — descoberto via smoke test
+> manual (`POST /api/auth/register` devolvia `500` em vez de `400`), não previsto neste plano
+> antes da implementação.
 
 `UploadBookForm` (classe, não record — `BookController.cs`): `[Required, StringLength(300)]` em
 `Title`, `[RegularExpression("^[a-z]{2}(-[A-Z]{2})?$")]` em `Language`,
@@ -626,12 +635,14 @@ mensagem clara (P11), não só na primeira chamada de login.
   `UseExceptionHandler`. Se quiser um log estruturado com `traceId`/`userId` no escopo (item
   opcional "4.4 observabilidade", não coberto por este plano — ver seção 9), esse é o lugar mais
   natural para adicionar.
-- **`DataAnnotations` em `record` com posição por índice de parâmetro**: atributos em
-  `record Foo([property: Required] string X)` exigem o prefixo `[property: ...]` — usar
-  `[Required]` sozinho no parâmetro do `record` aplica ao **parâmetro do construtor**, não à
-  propriedade gerada, e o `ModelState` do ASP.NET Core valida propriedades, não parâmetros de
-  construtor — atributo sem `[property: ...]` silenciosamente não teria efeito nenhum. Atenção ao
-  codar P5.
+- **`DataAnnotations` em `record` com posição por índice de parâmetro**: ~~atributos em
+  `record Foo([property: Required] string X)` exigem o prefixo `[property: ...]`~~ — **checado
+  durante a implementação e é o oposto**: `[property: Required]` faz o ASP.NET Core lançar
+  `InvalidOperationException` em toda requisição (a validação "seria ignorada" e o runtime prefere
+  falhar alto a silenciar); o atributo precisa ir **sem** target explícito
+  (`record Foo([Required] string X)`) para se associar ao parâmetro do construtor primário, que é
+  o que o validador de records do `[ApiController]` usa. Já corrigido em todas as DTOs deste plano
+  (commit separado, "P5 fix") e verificado manualmente contra um Postgres real.
 - **`options.GlobalLimiter` + policy nomeada = duas contagens por request**: já documentado na
   nota de [5.6](#56-ratelimiter-diff) — confirmar que isso é aceitável (é, dado os limites
   escolhidos) antes de a policy de upload ficar mais apertada que o limite global no futuro (nesse
