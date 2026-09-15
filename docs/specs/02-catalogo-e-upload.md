@@ -1,6 +1,6 @@
 # 02 — Catálogo e upload de livros
 
-**Status:** Não iniciado
+**Status:** Concluído
 **Depende de:** 00, 01
 **Objetivo:** Implementar o contexto `Catalog`: redesenhar a entidade `Book` (visibilidade
 pública vs. pessoal), CRUD de metadados, upload de PDF com validação, abstração de

@@ -1,10 +1,16 @@
 using System.Threading.RateLimiting;
 using EReader_API.Application.Identity;
+using EReader_API.Application.Storage;
+using EReader_API.Domain.Interfaces;
 using EReader_API.Infra.Context;
 using EReader_API.Infra.Identity;
+using EReader_API.Infra.Repositories;
+using EReader_API.Infra.Seed;
+using EReader_API.Infra.Storage;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
@@ -72,6 +78,15 @@ public static class DependencyInjection
         services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
         services.AddScoped<IRefreshTokenStore, RefreshTokenStore>();
         services.AddScoped<IEmailSender, LogEmailSender>();
+
+        var fileStorageOptions = configuration.GetSection("FileStorage").Get<FileStorageOptions>()
+                                  ?? new FileStorageOptions();
+        services.AddSingleton(fileStorageOptions);
+        services.Configure<FormOptions>(o => o.MultipartBodyLengthLimit = fileStorageOptions.MaxUploadBytes);
+
+        services.AddScoped<IFileStorage, LocalFileStorage>();
+        services.AddScoped<IBookRepository, BookRepository>();
+        services.AddScoped<PublicLibrarySeeder>();
 
         return services;
     }

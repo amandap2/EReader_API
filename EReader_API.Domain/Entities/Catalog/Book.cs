@@ -1,13 +1,20 @@
-﻿namespace EReader_API.Domain.Entities.Catalog
+namespace EReader_API.Domain.Entities.Catalog;
+
+public class Book
 {
-    public class Book
-    {
-        public int Id {  get; set; }
-        public string Name { get; set; }
-        public string Author { get; set; }
-        public string FilePath { get; set; }
-        public string Format {  get; set; }
-        public string Category { get; set; }
-        public DateTime LaunchDate { get; set; }
-    }
+    public Guid Id { get; set; }
+    public string Title { get; set; } = "";
+    public string? Author { get; set; }
+    public string? Description { get; set; }
+    public string? Language { get; set; }
+    public string Format { get; set; } = "pdf";
+    public BookSource Source { get; set; }
+    public Guid? OwnerId { get; set; }
+    public string FileKey { get; set; } = "";
+    public long FileSizeBytes { get; set; }
+    public int? PageCount { get; set; }
+    public string? CoverImageKey { get; set; }
+    public DateTime? PublishedDate { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
 }
