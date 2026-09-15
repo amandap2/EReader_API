@@ -4,6 +4,7 @@ using EReader_API.Infra;
 using EReader_API.Infra.Context;
 using EReader_API.Infra.Seed;
 using EReader_API.Infrastructure;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
 
@@ -59,5 +60,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false });
+app.MapHealthChecks("/health/ready");
 
 app.Run();

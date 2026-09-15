@@ -114,6 +114,10 @@ public static class DependencyInjection
         services.AddScoped<IHighlightRepository, HighlightRepository>();
         services.AddScoped<INoteRepository, NoteRepository>();
 
+        services.AddHealthChecks()
+            .AddDbContextCheck<ApplicationDbContext>()
+            .AddCheck<FileStorageHealthCheck>("file_storage");
+
         return services;
     }
 }
