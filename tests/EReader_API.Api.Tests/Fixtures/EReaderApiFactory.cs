@@ -6,7 +6,6 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Npgsql;
@@ -26,11 +25,27 @@ public class EReaderApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     private readonly string _fileStorageRoot =
         Path.Combine(Path.GetTempPath(), "ereader-tests", Guid.NewGuid().ToString("N"));
 
+    private readonly string _jwtSigningKey =
+        Convert.ToBase64String(Encoding.UTF8.GetBytes("test-signing-key-32-bytes-minimum!!"));
+
     private Respawner? _respawner;
 
     public async Task InitializeAsync()
     {
         await _db.StartAsync();
+
+        // Program.cs.AddInfrastructure lê ConnectionStrings:Default (e o Options<JwtOptions>
+        // valida Jwt:SigningKey) de forma síncrona em builder.Services.AddInfrastructure(...),
+        // ANTES de builder.Build() ser chamado. O hook ConfigureWebHost/ConfigureAppConfiguration
+        // abaixo só é aplicado no instante do Build() (via a interceptação por DiagnosticListener
+        // que o WebApplicationFactory usa para hospedar um Program.cs de top-level statements) —
+        // tarde demais para essa leitura eager. Setar variável de ambiente de processo ANTES do
+        // primeiro acesso a `Services` funciona porque WebApplicationBuilder.CreateBuilder já
+        // inclui variáveis de ambiente como fonte de config desde a criação do builder.
+        Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", "Testing"); // D-05-5
+        Environment.SetEnvironmentVariable("ConnectionStrings__Default", _db.GetConnectionString());
+        Environment.SetEnvironmentVariable("Jwt__SigningKey", _jwtSigningKey); // D-05-7
+        Environment.SetEnvironmentVariable("FileStorage__RootPath", _fileStorageRoot); // D-05-6
 
         using var scope = Services.CreateScope();
         await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>()
@@ -56,18 +71,13 @@ public class EReaderApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        // D-05-5: pula o bloco `if (Environment.IsDevelopment())` do Program.cs (migração
-        // automática + seed do catálogo público + /openapi//scalar) e, com o guard de P3,
-        // também pula app.UseRateLimiter() (D-05-9).
+        // Redundante com a variável de ambiente ASPNETCORE_ENVIRONMENT acima (que já resolve
+        // isso antes do Build()), mas mantido explícito: pula o bloco
+        // `if (Environment.IsDevelopment())` do Program.cs (migração automática + seed do
+        // catálogo público + /openapi//scalar) e, com o guard de P3, também pula
+        // app.UseRateLimiter() (D-05-9) — ambos avaliados em cima de `app.Environment` depois do
+        // Build(), onde este hook já surte efeito normalmente.
         builder.UseEnvironment("Testing");
-
-        builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(
-        [
-            new("ConnectionStrings:Default", _db.GetConnectionString()),
-            new("Jwt:SigningKey",
-                Convert.ToBase64String(Encoding.UTF8.GetBytes("test-signing-key-32-bytes-minimum!!"))),
-            new("FileStorage:RootPath", _fileStorageRoot), // D-05-6
-        ]));
 
         builder.ConfigureTestServices(services =>
         {
