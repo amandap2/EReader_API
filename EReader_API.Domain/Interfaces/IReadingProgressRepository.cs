@@ -6,5 +6,6 @@ public interface IReadingProgressRepository
 {
     Task<ReadingProgress?> GetAsync(Guid userId, Guid bookId, CancellationToken ct);
     Task<IReadOnlyList<ReadingProgress>> ListByUserAsync(Guid userId, CancellationToken ct);
+    Task<IReadOnlyList<ReadingProgress>> ListByBookAsync(Guid bookId, CancellationToken ct);
     Task UpsertAsync(ReadingProgress progress, CancellationToken ct);
 }

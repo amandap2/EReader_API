@@ -13,19 +13,11 @@ public class ReadingProgressController(IReadingProgressService service) : Contro
     [HttpGet]
     public async Task<IActionResult> Get(Guid bookId, CancellationToken ct)
     {
-        try
-        {
-            var dto = await service.GetAsync(bookId, User.GetUserId(), ct);
-            return dto is null ? NoContent() : Ok(dto);
-        }
-        catch (ReadingNotFoundException) { return NotFound(); }
+        var dto = await service.GetAsync(bookId, User.GetUserId(), ct);
+        return dto is null ? NoContent() : Ok(dto);
     }
 
     [HttpPut]
-    public async Task<IActionResult> Upsert(Guid bookId, UpdateProgressRequest req, CancellationToken ct)
-    {
-        try { return Ok(await service.UpsertAsync(bookId, req, User.GetUserId(), ct)); }
-        catch (ReadingNotFoundException) { return NotFound(); }
-        catch (ReadingValidationException ex) { return ValidationProblem(string.Join("; ", ex.Errors)); }
-    }
+    public async Task<IActionResult> Upsert(Guid bookId, UpdateProgressRequest req, CancellationToken ct) =>
+        Ok(await service.UpsertAsync(bookId, req, User.GetUserId(), ct));
 }

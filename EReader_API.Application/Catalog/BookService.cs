@@ -1,12 +1,22 @@
 using System.Text;
+using EReader_API.Application.Common;
+using EReader_API.Application.Common.Exceptions;
 using EReader_API.Application.Storage;
 using EReader_API.Domain.Common;
 using EReader_API.Domain.Entities.Catalog;
+using EReader_API.Domain.Entities.Reading;
 using EReader_API.Domain.Interfaces;
+using Microsoft.Extensions.Logging;
 
 namespace EReader_API.Application.Catalog;
 
-public class BookService(IBookRepository repository, IFileStorage fileStorage, FileStorageOptions options) : IBookService
+public class BookService(
+    IBookRepository repository,
+    IFileStorage fileStorage,
+    FileStorageOptions options,
+    IPdfInspector pdfInspector,
+    IReadingProgressRepository progressRepository,
+    ILogger<BookService> logger) : IBookService
 {
     private static readonly HashSet<string> AllowedSorts = new(StringComparer.Ordinal)
     {
@@ -59,6 +69,26 @@ public class BookService(IBookRepository repository, IFileStorage fileStorage, F
 
         var fileKey = await fileStorage.SaveAsync(req.FileContent, req.ContentType, req.FileName, ct);
 
+        var pageCount = req.PageCount;
+        string? coverImageKey = null;
+        try
+        {
+            if (req.FileContent.CanSeek)
+                req.FileContent.Seek(0, SeekOrigin.Begin);
+
+            var inspection = await pdfInspector.InspectAsync(req.FileContent, ct);
+            pageCount = inspection.PageCount;
+            if (inspection.CoverJpegBytes is { } jpeg)
+            {
+                using var coverStream = new MemoryStream(jpeg);
+                coverImageKey = await fileStorage.SaveCoverAsync(coverStream, ct);
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Falha ao extrair PageCount/capa do PDF recém-enviado.");
+        }
+
         var now = DateTime.UtcNow;
         var book = new Book
         {
@@ -72,13 +102,15 @@ public class BookService(IBookRepository repository, IFileStorage fileStorage, F
             OwnerId = ownerId,
             FileKey = fileKey,
             FileSizeBytes = req.FileSizeBytes,
-            PageCount = req.PageCount,
+            PageCount = pageCount,
+            CoverImageKey = coverImageKey,
             PublishedDate = req.PublishedDate,
             CreatedAt = now,
             UpdatedAt = now,
         };
 
         await repository.AddAsync(book, ct);
+        await PropagateProgressAsync(book.Id, book.PageCount, ct);
         return BookMapper.ToDto(book);
     }
 
@@ -100,12 +132,16 @@ public class BookService(IBookRepository repository, IFileStorage fileStorage, F
         book.UpdatedAt = DateTime.UtcNow;
 
         await repository.UpdateAsync(book, ct);
+        await PropagateProgressAsync(book.Id, book.PageCount, ct);
         return BookMapper.ToDto(book);
     }
 
     public async Task DeleteAsync(Guid id, Guid requesterId, CancellationToken ct)
     {
         var book = await GetAuthorizedAsync(id, requesterId, ct);
+        if (book.Source == BookSource.PublicDomain)
+            throw new BookForbiddenException();
+
         await fileStorage.DeleteAsync(book.FileKey, ct);
         await repository.RemoveAsync(book, ct);
     }
@@ -134,6 +170,17 @@ public class BookService(IBookRepository repository, IFileStorage fileStorage, F
         {
             await fileStorage.DeleteAsync(book.FileKey, ct);
             await repository.RemoveAsync(book, ct);
+        }
+    }
+
+    private async Task PropagateProgressAsync(Guid bookId, int? pageCount, CancellationToken ct)
+    {
+        var progresses = await progressRepository.ListByBookAsync(bookId, ct);
+        foreach (var progress in progresses)
+        {
+            progress.TotalPages = pageCount;
+            progress.PercentComplete = ReadingProgressCalculator.PercentComplete(progress.CurrentPage, pageCount);
+            await progressRepository.UpsertAsync(progress, ct);
         }
     }
 

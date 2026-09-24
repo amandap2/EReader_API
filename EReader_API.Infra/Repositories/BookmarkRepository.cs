@@ -8,10 +8,10 @@ namespace EReader_API.Infra.Repositories;
 public class BookmarkRepository(ApplicationDbContext db) : IBookmarkRepository
 {
     public async Task<IReadOnlyList<Bookmark>> ListAsync(Guid userId, Guid bookId, CancellationToken ct) =>
-        await db.Bookmarks.Where(b => b.UserId == userId && b.BookId == bookId).ToListAsync(ct);
+        await db.Bookmarks.AsNoTracking().Where(b => b.UserId == userId && b.BookId == bookId).ToListAsync(ct);
 
     public Task<Bookmark?> GetByIdAsync(Guid id, CancellationToken ct) =>
-        db.Bookmarks.FirstOrDefaultAsync(b => b.Id == id, ct);
+        db.Bookmarks.AsNoTracking().FirstOrDefaultAsync(b => b.Id == id, ct);
 
     public async Task AddAsync(Bookmark bookmark, CancellationToken ct)
     {

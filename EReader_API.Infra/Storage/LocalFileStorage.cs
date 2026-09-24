@@ -26,6 +26,20 @@ public class LocalFileStorage : IFileStorage
         return fileKey;
     }
 
+    public async Task<string> SaveCoverAsync(Stream content, CancellationToken ct)
+    {
+        var now = DateTime.UtcNow;
+        var fileKey = $"{now:yyyy}/{now:MM}/{Guid.NewGuid():N}-cover.jpg";
+        var fullPath = ResolvePath(fileKey);
+
+        Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+
+        await using var fileStream = new FileStream(fullPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, useAsync: true);
+        await content.CopyToAsync(fileStream, ct);
+
+        return fileKey;
+    }
+
     public Task<Stream> OpenReadAsync(string fileKey, CancellationToken ct)
     {
         var fullPath = ResolvePath(fileKey);

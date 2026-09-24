@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace EReader_API.Application.Identity;
 
-public record ForgotPasswordRequest(string Email);
+public record ForgotPasswordRequest([Required, EmailAddress] string Email);

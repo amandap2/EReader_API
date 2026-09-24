@@ -1,9 +1,13 @@
+using System.Globalization;
 using System.Threading.RateLimiting;
+using EReader_API.Application.Catalog;
+using EReader_API.Application.Common;
 using EReader_API.Application.Identity;
 using EReader_API.Application.Storage;
 using EReader_API.Domain.Interfaces;
 using EReader_API.Infra.Context;
 using EReader_API.Infra.Identity;
+using EReader_API.Infra.Pdf;
 using EReader_API.Infra.Repositories;
 using EReader_API.Infra.Seed;
 using EReader_API.Infra.Storage;
@@ -16,6 +20,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
 namespace EReader_API.Infra;
@@ -46,7 +51,10 @@ public static class DependencyInjection
             .AddEntityFrameworkStores<ApplicationDbContext>()
             .AddDefaultTokenProviders();
 
-        services.Configure<JwtOptions>(configuration.GetSection("Jwt"));
+        services.AddOptions<JwtOptions>()
+            .Bind(configuration.GetSection("Jwt"))
+            .Validate(o => !string.IsNullOrWhiteSpace(o.SigningKey), "Jwt:SigningKey não configurado.")
+            .ValidateOnStart();
 
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>
@@ -71,7 +79,35 @@ public static class DependencyInjection
                     Window = TimeSpan.FromMinutes(1),
                     QueueLimit = 0,
                 }));
+
+            options.AddPolicy("upload", httpContext => RateLimitPartition.GetFixedWindowLimiter(
+                partitionKey: httpContext.User.GetUserId().ToString(),
+                factory: _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 20,
+                    Window = TimeSpan.FromHours(1),
+                    QueueLimit = 0,
+                }));
+
+            options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                    factory: _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 100,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0,
+                    }));
+
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+            options.OnRejected = (context, ct) =>
+            {
+                if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+                    context.HttpContext.Response.Headers.RetryAfter =
+                        ((int)retryAfter.TotalSeconds).ToString(CultureInfo.InvariantCulture);
+
+                return ValueTask.CompletedTask;
+            };
         });
 
         services.AddScoped<IAuthService, AuthService>();
@@ -85,6 +121,7 @@ public static class DependencyInjection
         services.Configure<FormOptions>(o => o.MultipartBodyLengthLimit = fileStorageOptions.MaxUploadBytes);
 
         services.AddScoped<IFileStorage, LocalFileStorage>();
+        services.AddScoped<IPdfInspector, DocnetPdfInspector>();
         services.AddScoped<IBookRepository, BookRepository>();
         services.AddScoped<PublicLibrarySeeder>();
 
@@ -92,6 +129,10 @@ public static class DependencyInjection
         services.AddScoped<IBookmarkRepository, BookmarkRepository>();
         services.AddScoped<IHighlightRepository, HighlightRepository>();
         services.AddScoped<INoteRepository, NoteRepository>();
+
+        services.AddHealthChecks()
+            .AddDbContextCheck<ApplicationDbContext>()
+            .AddCheck<FileStorageHealthCheck>("file_storage");
 
         return services;
     }

@@ -10,28 +10,20 @@ namespace EReader_API.Controllers;
 public class BookmarksController(IBookmarkService service) : ControllerBase
 {
     [HttpGet("api/books/{bookId:guid}/bookmarks")]
-    public async Task<IActionResult> List(Guid bookId, CancellationToken ct)
-    {
-        try { return Ok(await service.ListAsync(bookId, User.GetUserId(), ct)); }
-        catch (ReadingNotFoundException) { return NotFound(); }
-    }
+    public async Task<IActionResult> List(Guid bookId, CancellationToken ct) =>
+        Ok(await service.ListAsync(bookId, User.GetUserId(), ct));
 
     [HttpPost("api/books/{bookId:guid}/bookmarks")]
     public async Task<IActionResult> Create(Guid bookId, CreateBookmarkRequest req, CancellationToken ct)
     {
-        try
-        {
-            var dto = await service.CreateAsync(bookId, req, User.GetUserId(), ct);
-            return CreatedAtAction(nameof(List), new { bookId }, dto);
-        }
-        catch (ReadingNotFoundException) { return NotFound(); }
-        catch (ReadingValidationException ex) { return ValidationProblem(string.Join("; ", ex.Errors)); }
+        var dto = await service.CreateAsync(bookId, req, User.GetUserId(), ct);
+        return CreatedAtAction(nameof(List), new { bookId }, dto);
     }
 
     [HttpDelete("api/bookmarks/{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
-        try { await service.DeleteAsync(id, User.GetUserId(), ct); return NoContent(); }
-        catch (ReadingNotFoundException) { return NotFound(); }
+        await service.DeleteAsync(id, User.GetUserId(), ct);
+        return NoContent();
     }
 }

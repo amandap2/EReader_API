@@ -1,6 +1,5 @@
+using EReader_API.Application.Common.Exceptions;
+
 namespace EReader_API.Application.Identity;
 
-public class IdentityValidationException(IEnumerable<string> errors) : Exception(string.Join("; ", errors))
-{
-    public IReadOnlyCollection<string> Errors { get; } = errors.ToList();
-}
+public class IdentityValidationException(IEnumerable<string> errors) : ValidationException(errors);

@@ -1,3 +1,8 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace EReader_API.Application.Identity;
 
-public record ResetPasswordRequest(string Email, string Token, string NewPassword);
+public record ResetPasswordRequest(
+    [Required, EmailAddress] string Email,
+    [Required] string Token,
+    [Required, MinLength(8)] string NewPassword);

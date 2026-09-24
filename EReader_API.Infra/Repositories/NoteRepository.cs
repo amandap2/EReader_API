@@ -8,10 +8,10 @@ namespace EReader_API.Infra.Repositories;
 public class NoteRepository(ApplicationDbContext db) : INoteRepository
 {
     public async Task<IReadOnlyList<Note>> ListAsync(Guid userId, Guid bookId, CancellationToken ct) =>
-        await db.Notes.Where(n => n.UserId == userId && n.BookId == bookId).ToListAsync(ct);
+        await db.Notes.AsNoTracking().Where(n => n.UserId == userId && n.BookId == bookId).ToListAsync(ct);
 
     public Task<Note?> GetByIdAsync(Guid id, CancellationToken ct) =>
-        db.Notes.FirstOrDefaultAsync(n => n.Id == id, ct);
+        db.Notes.AsNoTracking().FirstOrDefaultAsync(n => n.Id == id, ct);
 
     public async Task AddAsync(Note note, CancellationToken ct)
     {

@@ -1,3 +1,5 @@
+using EReader_API.Application.Common.Exceptions;
+
 namespace EReader_API.Application.Catalog;
 
-public class BookNotFoundException() : Exception("Livro não encontrado.");
+public class BookNotFoundException() : NotFoundException("Livro não encontrado.");

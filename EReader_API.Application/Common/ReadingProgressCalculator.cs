@@ -1,4 +1,4 @@
-namespace EReader_API.Application.Reading;
+namespace EReader_API.Application.Common;
 
 public static class ReadingProgressCalculator
 {

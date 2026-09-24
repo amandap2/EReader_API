@@ -14,42 +14,17 @@ public class AuthController(IAuthService authService) : ControllerBase
     [HttpPost("register")]
     public async Task<IActionResult> Register(RegisterRequest req, CancellationToken ct)
     {
-        try
-        {
-            var result = await authService.RegisterAsync(req, ct);
-            return StatusCode(StatusCodes.Status201Created, result);
-        }
-        catch (IdentityValidationException ex)
-        {
-            return ValidationProblem(string.Join("; ", ex.Errors));
-        }
+        var result = await authService.RegisterAsync(req, ct);
+        return StatusCode(StatusCodes.Status201Created, result);
     }
 
     [HttpPost("login")]
-    public async Task<IActionResult> Login(LoginRequest req, CancellationToken ct)
-    {
-        try
-        {
-            return Ok(await authService.LoginAsync(req, ct));
-        }
-        catch (AuthException ex)
-        {
-            return Unauthorized(new { message = ex.Message });
-        }
-    }
+    public async Task<IActionResult> Login(LoginRequest req, CancellationToken ct) =>
+        Ok(await authService.LoginAsync(req, ct));
 
     [HttpPost("refresh")]
-    public async Task<IActionResult> Refresh(RefreshRequest req, CancellationToken ct)
-    {
-        try
-        {
-            return Ok(await authService.RefreshAsync(req.RefreshToken, ct));
-        }
-        catch (AuthException ex)
-        {
-            return Unauthorized(new { message = ex.Message });
-        }
-    }
+    public async Task<IActionResult> Refresh(RefreshRequest req, CancellationToken ct) =>
+        Ok(await authService.RefreshAsync(req.RefreshToken, ct));
 
     [Authorize]
     [HttpPost("logout")]
@@ -69,15 +44,8 @@ public class AuthController(IAuthService authService) : ControllerBase
     [HttpPost("reset-password")]
     public async Task<IActionResult> ResetPassword(ResetPasswordRequest req, CancellationToken ct)
     {
-        try
-        {
-            await authService.ResetPasswordAsync(req, ct);
-            return NoContent();
-        }
-        catch (IdentityValidationException ex)
-        {
-            return ValidationProblem(string.Join("; ", ex.Errors));
-        }
+        await authService.ResetPasswordAsync(req, ct);
+        return NoContent();
     }
 
     [Authorize]

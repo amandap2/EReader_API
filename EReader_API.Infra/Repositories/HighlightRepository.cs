@@ -8,10 +8,10 @@ namespace EReader_API.Infra.Repositories;
 public class HighlightRepository(ApplicationDbContext db) : IHighlightRepository
 {
     public async Task<IReadOnlyList<Highlight>> ListAsync(Guid userId, Guid bookId, CancellationToken ct) =>
-        await db.Highlights.Where(h => h.UserId == userId && h.BookId == bookId).ToListAsync(ct);
+        await db.Highlights.AsNoTracking().Where(h => h.UserId == userId && h.BookId == bookId).ToListAsync(ct);
 
     public Task<Highlight?> GetByIdAsync(Guid id, CancellationToken ct) =>
-        db.Highlights.FirstOrDefaultAsync(h => h.Id == id, ct);
+        db.Highlights.AsNoTracking().FirstOrDefaultAsync(h => h.Id == id, ct);
 
     public async Task AddAsync(Highlight highlight, CancellationToken ct)
     {
