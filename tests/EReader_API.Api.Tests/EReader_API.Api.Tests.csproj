@@ -27,4 +27,8 @@
     <ProjectReference Include="..\..\EReader_API\EReader_API.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="Fixtures\minimal.pdf" />
+  </ItemGroup>
+
 </Project>
