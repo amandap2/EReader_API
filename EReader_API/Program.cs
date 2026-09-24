@@ -57,10 +57,17 @@ app.UseHttpsRedirection();
 app.UseCors(WebCors);
 app.UseAuthentication();
 app.UseAuthorization();
-app.UseRateLimiter();
+
+// Sob WebApplicationFactory/TestServer, RemoteIpAddress vem null, então a policy "auth" e o
+// GlobalLimiter (partition por IP) colapsariam toda a suíte de testes numa única partição
+// "unknown" — pular o middleware inteiro no ambiente de teste evita isso (ver D-05-9).
+if (!app.Environment.IsEnvironment("Testing"))
+    app.UseRateLimiter();
 
 app.MapControllers();
 app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false });
 app.MapHealthChecks("/health/ready");
 
 app.Run();
+
+public partial class Program;

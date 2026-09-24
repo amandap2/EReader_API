@@ -40,7 +40,17 @@ D-03-10). 04 (Robustez) is in progress: a common exception hierarchy
 `ReadingProgress` rows, `Book(Title)` has an index, and `Jwt:SigningKey` fails fast at startup —
 see `docs/specs/plans/04-robustez.md` for the as-built design, decisions (D-04-1 to D-04-11) and
 what's still open (DB-side projection in `BookRepository.QueryAsync`, structured
-request-scoped logging, `EXPLAIN`-verified index usage). No test project exists yet (spec 05).
+request-scoped logging, `EXPLAIN`-verified index usage). 05 (Testes) is done: three xUnit
+projects under `tests/` (`EReader_API.Domain.Tests`, `EReader_API.Application.Tests` — which also
+references `Infra`, since `AuthService` lives there, not `Application`, see `docs/specs/
+plans/05-testes.md` D-05-2 — and `EReader_API.Api.Tests`), `EReaderApiFactory` (a
+`WebApplicationFactory<Program>` fused with a Testcontainers `postgres:17` fixture, D-05-8) +
+Respawn resetting the database before every integration test, `AuthHelper`/`BookBuilder` test
+helpers, and `Program.cs` gained `public partial class Program;` plus a guard skipping
+`app.UseRateLimiter()` when `ASPNETCORE_ENVIRONMENT=Testing` (D-05-9, otherwise every test's
+requests collapse into the same `"unknown"` IP partition under `TestServer` and the suite hits
+`429`) — see `docs/specs/plans/05-testes.md` for the as-built design and decisions (D-05-1 to
+D-05-9).
 
 ## Commands
 
@@ -58,8 +68,13 @@ Run the full stack (API + PostgreSQL 17) in containers:
 docker compose -f EReader_API/docker-compose.yml up --build   # API on :8080, Postgres on :5432
 ```
 
-Tests: no test project exists yet. When adding one, wire it into `EReader.slnx` and run with
-`dotnet test`.
+Tests: `dotnet test EReader.slnx` runs all three projects (`tests/EReader_API.Domain.Tests`,
+`tests/EReader_API.Application.Tests`, `tests/EReader_API.Api.Tests`). `Api.Tests` needs **Docker
+running** — it spins up a real `postgres:17` container via Testcontainers (`EReaderApiFactory`,
+one container reused for the whole test collection) and resets it with Respawn before every test;
+without Docker reachable, those tests fail fast with a clear Testcontainers connection error, not
+a hang. To run just the fast unit-test projects without Docker:
+`dotnet test tests/EReader_API.Domain.Tests tests/EReader_API.Application.Tests`.
 
 EF Core migrations: `dotnet-ef` is installed globally and `EReader_API.Infra` has the design
 package + `ApplicationDbContext` registered. Current migrations: `AddIdentityAndRefreshTokens`

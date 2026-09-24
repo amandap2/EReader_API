@@ -1,6 +1,6 @@
 # 05 — Infraestrutura de testes
 
-**Status:** Não iniciado
+**Status:** Concluído
 **Depende de:** 00 (iniciar logo após; evoluir junto com 01–04)
 **Objetivo:** Montar a base de testes automatizados — projetos xUnit, PostgreSQL efêmero via
 Testcontainers e `WebApplicationFactory` — para que cada spec seguinte adicione seus testes
@@ -29,31 +29,36 @@ Stack: `xunit`, `xunit.runner.visualstudio`, `Microsoft.NET.Test.Sdk`, `FluentAs
 
 ## Helpers compartilhados (`EReader_API.Api.Tests`)
 
-- [ ] `PostgresFixture` (`ICollectionFixture`): sobe um container `postgres:17`, expõe a
-      connection string, roda `Database.Migrate()` uma vez.
-- [ ] `EReaderApiFactory : WebApplicationFactory<Program>`: substitui a connection string pela
+- [x] `PostgresFixture` (`ICollectionFixture`): sobe um container `postgres:17`, expõe a
+      connection string, roda `Database.Migrate()` uma vez. (Fundida em `EReaderApiFactory`, não
+      uma classe separada — D-05-8 no plano.)
+- [x] `EReaderApiFactory : WebApplicationFactory<Program>`: substitui a connection string pela
       do container; troca `IEmailSender` por um fake que captura o token de reset; usa o
       `IFileStorage` local apontando para um diretório temporário por execução.
-- [ ] `Respawn` para limpar as tabelas (exceto migrations) entre testes.
-- [ ] `AuthHelper`: `RegisterAndLoginAsync(client)` → devolve `HttpClient` com o Bearer já
+- [x] `Respawn` para limpar as tabelas (exceto migrations) entre testes.
+- [x] `AuthHelper`: `RegisterAndLoginAsync(client)` → devolve `HttpClient` com o Bearer já
       setado + o `userId`.
-- [ ] Builders: `BookBuilder`, `pdf de teste` mínimo válido (`%PDF-...`) embutido como
+- [x] Builders: `BookBuilder`, `pdf de teste` mínimo válido (`%PDF-...`) embutido como
       recurso.
-- [ ] Expor a classe `Program` para o `WebApplicationFactory` (`public partial class Program {}`
+- [x] Expor a classe `Program` para o `WebApplicationFactory` (`public partial class Program {}`
       no fim de `Program.cs`).
 
 ## Tarefas
 
-- [ ] Criar os três projetos em `tests/` e adicioná-los ao `EReader.slnx`.
-- [ ] Adicionar os pacotes NuGet listados.
-- [ ] Implementar os helpers acima.
-- [ ] `EReader_API.Domain.Tests`: primeiro teste real — cálculo de `PercentComplete`
-      (0 quando `TotalPages` nulo/zero; arredondamento; limites).
-- [ ] `EReader_API.Application.Tests`: primeiro teste — `AuthService` rejeita credenciais
-      inválidas e rotaciona refresh token.
-- [ ] `EReader_API.Api.Tests`: smoke — `GET /health/ready` → 200; register→login→`GET /me`.
-- [ ] Documentar no `README`/`CLAUDE.md`: `dotnet test` exige Docker em execução (Testcontainers).
-- [ ] (Opcional) `coverlet.collector` + relatório de cobertura.
+- [x] Criar os três projetos em `tests/` e adicioná-los ao `EReader.slnx`.
+- [x] Adicionar os pacotes NuGet listados.
+- [x] Implementar os helpers acima.
+- [x] `EReader_API.Domain.Tests`: primeiro teste real — igualdade de `BookQuery` + valores do
+      enum `BookSource` (não `PercentComplete`, que hoje mora em `Application`, não `Domain` —
+      D-05-1 no plano).
+- [x] `EReader_API.Application.Tests`: primeiro teste — `AuthService` rejeita credenciais
+      inválidas e rotaciona refresh token (referencia `Infra`, onde `AuthService` mora —
+      D-05-2 no plano).
+- [x] `EReader_API.Api.Tests`: smoke — `GET /health/ready` → 200; register→login→`GET /me`; mais
+      o fluxo completo (upload→download com `Range`→delete) e casos de auth/autorização.
+- [x] Documentar no `README`/`CLAUDE.md`: `dotnet test` exige Docker em execução (Testcontainers).
+- [x] `coverlet.collector` incluído (item opcional do checklist); relatório de cobertura
+      formal não gerado.
 
 ## Convenções de teste
 
